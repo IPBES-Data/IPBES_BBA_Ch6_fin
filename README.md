@@ -1,4 +1,4 @@
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.10218647.svg)](https://doi.org/10.5281/zenodo.10218647)
+[![DOI](https://zenodo.org/badge/DOI/9999999999.svg)](https://doi.org/9999999999)
 [![GitHub release](https://img.shields.io/github/release/IPBES-Data/IPBES_BBA_Ch6_fin.svg)](https://github.com/IPBES-Data/IPBES_BBA_Ch6_fin/releases/latest)
 [![GitHub commits since latest release](https://img.shields.io/github/commits-since/IPBES-Data/IPBES_BBA_Ch6_fin/latest)](https://github.com/IPBES-Data/IPBES_BBA_Ch6_fin/commits/main)
 [![License: CC BY 4.0](https://img.shields.io/badge/License-CC%20BY%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by/4.0/)
