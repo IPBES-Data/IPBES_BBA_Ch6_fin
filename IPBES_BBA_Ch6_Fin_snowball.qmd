@@ -2,10 +2,12 @@
 title: 'Snowball sampling BBA Chapter 6'
 subtitle: 'Data Management Report'
 author:
-  - name: Rainer M Krug
+  - name: 
+        family: Krug
+        given: Rainer M.
     id: rmk
     orcid: 0000-0002-7490-0066
-    email: Rainer@krugs.de, Rainer.Krug@uzh.ch
+    email: Rainer@krugs.de
     affiliation: 
       - name: University of Zurich
         city: Zurich
@@ -27,6 +29,7 @@ citation:
   type: report
   container-title: IPBES Data Management Report
   doi: 99.99.99999999
+date: '`r Sys.Date()`'
 doi: 99.99.99999999
 version: 0.0.1
 
@@ -51,13 +54,26 @@ params:
 #| label: setup
 #| include: false
 
-if (!exists("params")){
-  params <- rmarkdown::yaml_front_matter('~/Documents_Local/git/IPBES_data_tsu/Assessments/Business/IPBES_BBA_Ch6_search/IPBES_BBA_Ch6_Fin_snowball.qmd')$params
+if (!exists("params")) {
+    params <- rmarkdown::yaml_front_matter("~/Documents_Local/git/IPBES_data_tsu/Assessments/Business/IPBES_BBA_Ch6_search/IPBES_BBA_Ch6_Fin_snowball.qmd")$params
 }
 
 build <- as.integer(readLines("buildNo"))
 build <- build + 1
 writeLines(as.character(build), "buildNo")
+
+## Now specific code
+
+library(openalexR)
+library(dplyr)
+if (!require("IPBES.R")) {
+    install.packages(
+        "IPBES.R",
+        repos = c("https://ipbes-data.r-universe.dev", "https://cloud.r-project.org")
+    )
+    library(IPBES.R)
+}
+library(networkD3)
 ```
 
 ## Working Title
@@ -65,44 +81,25 @@ Literature search for BBA Chapter 6 Finance Section
 
 ## Code repo
 
-[Github - private](https://github.com/IPBES-Data/IPBES-TfC-Ch-2-Vision)
+[IPBES_BBA_Ch6_fin](https://github.com/IPBES-Data/IPBES_BBA_Ch6_fin)
 
 ## Build No: `r build`
 
 
-## Setup
-
-Internal code for setup of the snowball search.
+## Read Key-paper
 
 ```{r}
-#| 
-
-library(bibtex)
-library(openalexR)
-library(writexl)
-library(tibble)
-library(dplyr)
-library(ggraph) 
-library(tidygraph)
-if (!require("IPBES.R")){
-    install.packages(
-        "IPBES.R", 
-        repos = c('https://ipbes-data.r-universe.dev', 'https://cloud.r-project.org')
-    )
-    library(IPBES.R)
-}
-
-# library(ggplot2)
-# library(knitr)
+#| label: read_key_paper
+#|
 
 kp <- jsonlite::read_json(params$keypapers)
 
 dois <- sapply(
     kp,
     function(x) {
-      x$DOI
+        x$DOI
     }
- ) |>
+) |>
     unlist() |>
     unique() |>
     as.character()
@@ -110,9 +107,7 @@ dois <- sapply(
 dois <- dois[!is.null(dois)]
 ```
 
-Of the `r length(kp)` keypapers, `r length(dois[!is.na(dois)])` have a DOI. 
-For snowballing, ISBNs can also be used, 
-
+Of the **`r length(kp)`** keypapers, **`r length(dois[!is.na(dois)])`** have a DOI and can be used for the further search. 
 
 ## Searches
 
@@ -121,6 +116,9 @@ Searches are conducted with the [OpenAlex](https://openalex.org) API. The API is
 ### Get key_works 
 
 ```{r}
+#| label: openalex_key_works
+#|
+
 fn <- file.path("data", "key_works.rds")
 if (!file.exists(fn)) {
     key_works <- oa_fetch(
@@ -140,7 +138,7 @@ key_works_cit <- IPBES.R::abbreviate_authors(key_works)
 
 ```{r}
 #| label: openalex_snowball
-#| 
+#|
 
 ids <- openalexR:::shorten_oaid(key_works$id)
 
@@ -165,7 +163,7 @@ flat_snow <- snowball2df(snowball) |>
 
 ```{r}
 #| label: openalex_supplemented
-#| 
+#|
 
 fn <- file.path("data", "snowball_supplemented.rds")
 if (file.exists(fn)) {
@@ -219,7 +217,7 @@ snowball$edges |>
     arrange(desc(Freq)) |>
     knitr::kable(
         col.names = c("Key paper", "Number of papers"),
-        caption = "Number of papers cited by Keypapers in the snowball search" 
+        caption = "Number of papers cited by Keypapers in the snowball search"
     )
 
 
@@ -235,79 +233,150 @@ snowball$edges |>
     arrange(desc(Freq)) |>
     knitr::kable(
         col.names = c("Key paper", "Number of papers"),
-        caption = "No of papers citing the Keypapers in the snowball search" 
+        caption = "No of papers citing the Keypapers in the snowball search"
     )
 ```
 
-### Save snowball as Excel file
+### Export snowball as Excel file
 
 ```{r}
 #| label: openalex_excel
-#| 
+#|
 
 fn <- file.path(".", "data", "snowball_excel.xlsx")
-if (!file.exists(fn)){
+if (!file.exists(fn)) {
     IPBES.R::to_xlsx(snowball, fn)
 }
 ```
 
 To download the Excsl file with all references, plese [click here](data/snowball_excel.xlsx).
 
-### Graph of links between references
+### Static Citation Network Graph
+
+#### Snowball Search
 
 ```{r}
 #| label: openalex_graph
 #|
 
-no <- list.files("figures", pattern = "snowball_cited", full.names = TRUE) |>
-    length() 
-    
-if (no != 4){
-    snowball$nodes$cited_by_count_by_year <- snowball$nodes$cited_by_count / (2024 - snowball$nodes$publication_year)
-
+name <- "snowball"
+if (
+    any(
+        !file.exists(
+            c(
+                file.path("figures", paste0(name, "_cited_by_count.png")),
+                file.path("figures", paste0(name, "_cited_by_count.pdf")),
+                file.path("figures", paste0(name, "_cited_by_count_by_year.png")),
+                file.path("figures", paste0(name, "_cited_by_count_by_year.pdf"))
+            )
+        )
+    )
+) {
     snowball_p <- snowball
-    
-   for  (i in seq_along(key_works_cit)) {
+
+    for  (i in seq_along(key_works_cit)) {
         snowball_p$nodes$id[snowball_p$nodes$id %in% key_works_cit[[i]]["id"]] <- key_works_cit[[i]]["cit"]
         snowball_p$edges$from[snowball_p$edges$from %in% key_works_cit[[i]]["id"]] <- key_works_cit[[i]]["cit"]
         snowball_p$edges$to[snowball_p$edges$to %in% key_works_cit[[i]]["id"]] <- key_works_cit[[i]]["cit"]
     }
 
-    IPBES.R::plot_snowball(snowball_p, name = "snowball", path = "figures")
-    rm(snowball_p)   
-}
-```
-![Cited by count](figures/snowball_cited_by_count.png)
-
-To download the highres graph, please [click here](figures/snowball_cited_by_count.pdf).
-
-
-### Graph of links between supplemented references
-
-```{r}
-#| label: snowball_supplemented_graphs
-no <- list.files("figures", pattern = "snowball_supplemented", full.names = TRUE) |>
-  length()  
-          
-if (no != 4){
-  snowball_supplemented$nodes$cited_by_count_by_year <- snowball_supplemented$nodes$cited_by_count / (2024 - snowball_supplemented$nodes$publication_year)
-
-  snowball_p <- snowball_supplemented
- 
-   for  (i in seq_along(key_works_cit)) {
-        snowball_p$nodes$id[snowball_p$nodes$id %in% key_works_cit[[i]]["id"]] <- key_works_cit[[i]]["cit"]
-        snowball_p$edges$from[snowball_p$edges$from %in% key_works_cit[[i]]["id"]] <- key_works_cit[[i]]["cit"]
-        snowball_p$edges$to[snowball_p$edges$to %in% key_works_cit[[i]]["id"]] <- key_works_cit[[i]]["cit"]
-    }
-
-    IPBES.R::plot_snowball(snowball_p, name = "snowball_supplemented", path = "figures")
+    IPBES.R::plot_snowball(snowball_p, name = pane, path = "figures")
     rm(snowball_p)
 }
 ```
 
-![Supplemented Cited by count](figures/snowball_supplemented_cited_by_count.png)
+![Cited by count](figures/snowball_cited_by_count_by_year.png)
 
-To download the highres graph, please [click here](figures/snowball_supplemented_cited_by_count.pdf).
+To download the highres graph, please [click here](figures/snowball_cited_by_count_by_year.pdf).
+
+#### Supplemented Snowball Search
+
+```{r}
+#| label: snowball_supplemented_graphs
+
+name <- "snowball_supplemented"
+if (
+    any(
+        !file.exists(
+            c(
+                file.path("figures", paste0(name, "_cited_by_count.png")),
+                file.path("figures", paste0(name, "_cited_by_count.pdf")),
+                file.path("figures", paste0(name, "_cited_by_count_by_year.png")),
+                file.path("figures", paste0(name, "_cited_by_count_by_year.pdf"))
+            )
+        )
+    )
+) {
+    snowball_supplemented$nodes$cited_by_count_by_year <- snowball_supplemented$nodes$cited_by_count / (2024 - snowball_supplemented$nodes$publication_year)
+
+    snowball_p <- snowball_supplemented
+
+    for  (i in seq_along(key_works_cit)) {
+        snowball_p$nodes$id[snowball_p$nodes$id %in% key_works_cit[[i]]["id"]] <- key_works_cit[[i]]["cit"]
+        snowball_p$edges$from[snowball_p$edges$from %in% key_works_cit[[i]]["id"]] <- key_works_cit[[i]]["cit"]
+        snowball_p$edges$to[snowball_p$edges$to %in% key_works_cit[[i]]["id"]] <- key_works_cit[[i]]["cit"]
+    }
+
+    IPBES.R::plot_snowball(snowball_p, name = name, path = "figures")
+    rm(snowball_p)
+}
+```
+
+![Supplemented Cited by count](figures/snowball_supplemented_cited_by_count_by_year.png)
+
+To download the highres graph, please [click here](figures/snowball_supplemented_cited_by_count_by_year.pdf).
+
+### Interactive Citation Network Graph
+
+The following interactions are possible:
+
+- moving your mouse over a node, the title author and year of the paper is shown.
+- clicking on a node will open the paper in a new tab.
+- scrolling up and down with your scroll wheel zooms in and out
+- clicking on the canvas and move the mouse will move the network
+- clicking on a node and dragging it moves the node
+
+#### Snowball Search
+
+```{r}
+#| label: openalex_graph_interactive_snowball_cited_by_count
+#|
+
+fn <- file.path("figures", "snowball_cited_by_count_by_year.html")
+# if (file.exists(fn)) {
+#     htmltools::includeHTML(fn)
+# } else {
+IPBES.R::plot_snowball_interactive(
+    snowball = snowball,
+    key_works = key_works,
+    file = fn
+)
+# }
+```
+
+To open the interactive graph in a standalone window [click here](figures/snowball_cited.html){target=_blank}.
+
+#### Supplemented Snowball Search
+
+```{r}
+#| label: openalex_graph_interactive_snowball_supplemented_cited_by_count
+
+
+# fn <- file.path("figures", "snowball_supplemented_cited_by_count.html")
+# if (file.exists(fn)) {
+#     htmltools::includeHTML(fn)
+# } else {
+IPBES.R::plot_snowball_interactive(
+    snowball = snowball_supplemented,
+    key_works = key_works,
+    file = fn
+)
+# }
+```
+
+To open the interactive graph in a standalone window [click here](figures/snowball_cited.html){target=_blank}.
+
+
 
 ### Identification of references with more than one edge
 
@@ -332,176 +401,181 @@ links |>
 ```
 
 
-## Identification of Concepts
+### Identification of Concepts
 
 OpenAlex assigns all works concepts. The concepts are in hirarchical order, ranging from 0 to 3. The higher the number, the more specific the concept. The concepts are assigned to the paper (`id`)
 
 
-### Level 0
+#### Level 0
 ```{r}
 #| label: l0
-#| 
+#|
 
-x <- lapply(
-    flat_snow[["concepts"]],
-    FUN = function(x) {
-        x[["display_name"]][x[["level"]] == 0]
-    }
-) |>
-    unlist() |>
-    table() |>
-    as.data.frame() |> 
-    rename(
-        l0_concept = Var1,
-        count = Freq
+level <- 0
+fn <- file.path(".", "data", paste0("concepts_l", level, ".rds"))
+if (!file.exists(fn)) {
+    x <- lapply(
+        flat_snow[["concepts"]],
+        FUN = function(x) {
+            x[["display_name"]][x[["level"]] == level]
+        }
     ) |>
-    arrange(desc(count))
+        unlist() |>
+        table() |>
+        as.data.frame() |>
+        arrange(desc(Freq))
+    names(x) <- c(paste0("l", level, "_concept"), "count")
+    saveRDS(x, fn)
+}
 
-writexl::write_xlsx(x, file.path(".", "data", "concepts_l0.xlsx"))
-
-knitr::kable(x)
+fn |>
+    readRDS() |>
+    knitr::kable()
 ```
 
-To download the Excel file, please [click here](data/concepts_l0.xlsx).
 
-### Level 1
+#### Level 1
 ```{r}
 #| label: l1
-#| 
+#|
 
-x <- lapply(
-    flat_snow[["concepts"]],
-    function(x) {
-        x[["display_name"]][x[["level"]] == 1]
-    }
-) |>
-    unlist() |>
-    table() |>
-    as.data.frame() |> 
-    rename(
-        l1_concept = Var1,
-        count = Freq
+level <- 1
+fn <- file.path(".", "data", paste0("concepts_l", level, ".rds"))
+if (!file.exists(fn)) {
+    x <- lapply(
+        flat_snow[["concepts"]],
+        FUN = function(x) {
+            x[["display_name"]][x[["level"]] == level]
+        }
     ) |>
-    arrange(desc(count))
-    
-writexl::write_xlsx(x, file.path(".", "data", "concepts_l1.xlsx"))
+        unlist() |>
+        table() |>
+        as.data.frame() |>
+        arrange(desc(Freq))
+    names(x) <- c(paste0("l", level, "_concept"), "count")
+    saveRDS(x, fn)
+}
 
-knitr::kable(x)
+fn |>
+    readRDS() |>
+    knitr::kable()
 ```
 
-To download the Excel file, please [click here](data/concepts_l1.xlsx).
 
-### Level 2
+#### Level 2
 
 ```{r}
 #| label: l2
-#| 
+#|
 
-x <- lapply(
-    flat_snow[["concepts"]],
-    function(x) {
-        x[["display_name"]][x[["level"]] == 2]
-    }
-) |>
-    unlist() |>
-    table() |>
-    as.data.frame() |> 
-    rename(
-        l2_concept = Var1,
-        count = Freq
+level <- 2
+fn <- file.path(".", "data", paste0("concepts_l", level, ".rds"))
+if (!file.exists(fn)) {
+    x <- lapply(
+        flat_snow[["concepts"]],
+        FUN = function(x) {
+            x[["display_name"]][x[["level"]] == level]
+        }
     ) |>
-    arrange(desc(count))
-    
-writexl::write_xlsx(x, file.path(".", "data", "concepts_l2.xlsx"))
+        unlist() |>
+        table() |>
+        as.data.frame() |>
+        arrange(desc(Freq))
+    names(x) <- c(paste0("l", level, "_concept"), "count")
+    saveRDS(x, fn)
+}
 
-knitr::kable(x)
+fn |>
+    readRDS() |>
+    knitr::kable()
 ```
 
-To download the Excel file, please [click here](data/concepts_l2.xlsx).
 
-### Level 3
+#### Level 3
 
 ```{r}
 #| label: l3
-#| 
+#|
 
-x <- lapply(
-    flat_snow[["concepts"]],
-    function(x) {
-        x[["display_name"]][x[["level"]] == 3]
-    }
-) |>
-    unlist() |>
-    table() |>
-    as.data.frame() |> 
-    rename(
-        l3_concept = Var1,
-        count = Freq
+level <- 3
+fn <- file.path(".", "data", paste0("concepts_l", level, ".rds"))
+if (!file.exists(fn)) {
+    x <- lapply(
+        flat_snow[["concepts"]],
+        FUN = function(x) {
+            x[["display_name"]][x[["level"]] == level]
+        }
     ) |>
-    arrange(desc(count))
-    
-writexl::write_xlsx(x, file.path(".", "data", "concepts_l3.xlsx"))
+        unlist() |>
+        table() |>
+        as.data.frame() |>
+        arrange(desc(Freq))
+    names(x) <- c(paste0("l", level, "_concept"), "count")
+    saveRDS(x, fn)
+}
 
-knitr::kable(x)
+fn |>
+    readRDS() |>
+    knitr::kable()
 ```
 
-To download the Excel file, please [click here](data/concepts_l3.xlsx).
 
-### Level 4
+#### Level 4
 
 ```{r}
 #| label: l4
-#| 
+#|
 
-x <- lapply(
-    flat_snow[["concepts"]],
-    function(x) {
-        x[["display_name"]][x[["level"]] == 4]
-    }
-) |>
-    unlist() |>
-    table() |>
-    as.data.frame() |> 
-    rename(
-        l4_concept = Var1,
-        count = Freq
+level <- 4
+fn <- file.path(".", "data", paste0("concepts_l", level, ".rds"))
+if (!file.exists(fn)) {
+    x <- lapply(
+        flat_snow[["concepts"]],
+        FUN = function(x) {
+            x[["display_name"]][x[["level"]] == level]
+        }
     ) |>
-    arrange(desc(count))
-    
-writexl::write_xlsx(x, file.path(".", "data", "concepts_l4.xlsx"))
-    
-knitr::kable(x)
+        unlist() |>
+        table() |>
+        as.data.frame() |>
+        arrange(desc(Freq))
+    names(x) <- c(paste0("l", level, "_concept"), "count")
+    saveRDS(x, fn)
+}
+
+fn |>
+    readRDS() |>
+    knitr::kable()
 ```
 
-To download the Excel file, please [click here](data/concepts_l4.xlsx).
-
-### Level 5
+#### Level 5
 
 ```{r}
 #| label: l5
-#| 
+#|
 
-x <- lapply(
-    flat_snow[["concepts"]],
-    function(x) {
-        x[["display_name"]][x[["level"]] == 5]
-    }
-) |>
-    unlist() |>
-    table() |>
-    as.data.frame() |> 
-    rename(
-        l5_concept = Var1,
-        count = Freq
+level <- 5
+fn <- file.path(".", "data", paste0("concepts_l", level, ".rds"))
+if (!file.exists(fn)) {
+    x <- lapply(
+        flat_snow[["concepts"]],
+        FUN = function(x) {
+            x[["display_name"]][x[["level"]] == level]
+        }
     ) |>
-    arrange(desc(count))
-    
-writexl::write_xlsx(x, file.path(".", "data", "concepts_l5.xlsx"))
+        unlist() |>
+        table() |>
+        as.data.frame() |>
+        arrange(desc(Freq))
+    names(x) <- c(paste0("l", level, "_concept"), "count")
+    saveRDS(x, fn)
+}
 
-knitr::kable(x)
+fn |>
+    readRDS() |>
+    knitr::kable()
 ```
 
-To download the Excel file, please [click here](data/concepts_l5.xlsx).
 
 
-
+# Bibliographic
