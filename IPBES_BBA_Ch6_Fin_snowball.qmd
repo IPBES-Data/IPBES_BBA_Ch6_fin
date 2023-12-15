@@ -31,7 +31,7 @@ citation:
   doi: 99.99.99999999
 date: '`r Sys.Date()`'
 doi: 99.99.99999999
-version: 0.0.1
+version: 0.1.0
 
 format:
     html:
