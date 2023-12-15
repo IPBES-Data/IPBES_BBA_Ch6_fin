@@ -83,7 +83,7 @@ Literature search for BBA Chapter 6 Finance Section
 
 [IPBES_BBA_Ch6_fin](https://github.com/IPBES-Data/IPBES_BBA_Ch6_fin)
 
-## Build No: `r build`
+## Version `r rmarkdown::metadata$version` Build No `r build`
 
 
 ## Read Key-paper
