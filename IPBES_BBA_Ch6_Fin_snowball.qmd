@@ -354,7 +354,7 @@ IPBES.R::plot_snowball_interactive(
 # }
 ```
 
-To open the interactive graph in a standalone window [click here](figures/snowball_cited.html){target=_blank}.
+To open the interactive graph in a standalone window [click here](figures/snowball_cited_by_count_by_year.html){target=_blank}.
 
 #### Supplemented Snowball Search
 
@@ -374,7 +374,7 @@ IPBES.R::plot_snowball_interactive(
 # }
 ```
 
-To open the interactive graph in a standalone window [click here](figures/snowball_cited.html){target=_blank}.
+To open the interactive graph in a standalone window [click here](figures/snowball_supplemented_cited_by_count.html){target=_blank}.
 
 
 
