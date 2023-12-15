@@ -41,6 +41,11 @@ format:
         embed-resources: true
         code-fold: true
         code-summary: 'Show the code'
+        grid:
+            sidebar-width: 0px
+            body-width: 4000px
+            margin-width: 200px
+            gutter-width: 1.5rem   
 params:
   keypapers: "./input/keypapers_snowball.json"
 ---
@@ -249,7 +254,29 @@ if (!file.exists(fn)) {
 }
 ```
 
+
 To download the Excsl file with all references, plese [click here](data/snowball_excel.xlsx).
+
+The column are: (the Concept columns are not that relevant at the moment)
+
+- **id**: internal id fromOpenAlex
+- **author**: authors of the paper
+- **publication_year**: publication year
+- **title**: title of the paper
+- **doi**: doi of the paper
+- **no_referenced_works**: number of references in the paper which are also in OpenAlex
+- **cited_global**: Number of times the paper has been cited
+- **cited_global_per_year**: standardised  number of times cirted (cited_global / number of years published)
+- **no_connections**: number of connections in the rgaph, i.e. either cited or citing a paper in the snowball corpus
+- **concepts_l0**: Concept 0. level assigned by OpenAlex
+- **concepts_l1**: Concept 1. level assigned by OpenAlex
+- **concepts_l2**: Concept 2. level assigned by OpenAlex
+- **concepts_l3**: Concept 3. level assigned by OpenAlex
+- **concepts_l4**: Concept 4. level assigned by OpenAlex
+- **concepts_l5**: Concept 5. level assigned by OpenAlex
+- **author_institute**: Institute of the authors
+- **institute_country**: Country of the institute
+- **abstract**: the abstract of the paper
 
 ### Static Citation Network Graph
 
